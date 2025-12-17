@@ -4,12 +4,11 @@
 
 ## Quick Start
 
- **Prerequisites**: You only need Python 3 installed.
+ You only need Python 3 installed.
   Install Dependencies: Run pip install -r requirements.txt.
- Install PyInstaller: Run pip install pyinstaller.
+  Install PyInstaller: Run pip install pyinstaller.
   Build: Run pyinstaller CmpileGUI.spec
-   ```
-
+  
 On the first run, Cmpile will:
 - Download a portable C++ compiler (LLVM-Mingw).
 - Download and set up `vcpkg` for library management.
@@ -38,4 +37,5 @@ python cmpile.py main.cpp utils.cpp --compiler-flags "-O2"
 
 - **Infrastructure**: All tools (compiler, git, vcpkg) are downloaded into the `internal_downloads` folder. To uninstall, simply delete that folder.
 - **Dependencies**: The tool scans your C++ file for headers. If it sees a known header (like `fmt/core.h` or `nlohmann/json.hpp`), it installs the corresponding package via vcpkg.
+
 
