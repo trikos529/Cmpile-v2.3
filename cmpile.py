@@ -86,7 +86,7 @@ class CmpileBuilder:
             else:
                 ui.display_status(message)
 
-    def build_and_run(self, source_files, compiler_flags=None, clean=False, run=True):
+    def build_and_run(self, source_files, compiler_flags=None, clean=False, run=True, extra_includes=None, extra_lib_paths=None, extra_link_flags=None):
 
         expanded_files = []
         for path in source_files:
@@ -125,11 +125,28 @@ class CmpileBuilder:
         required_packages = package_finder.map_includes_to_packages(all_includes)
 
         if required_packages:
-            self.log(f"Identified dependencies: {', '.join(required_packages)}")
+            # Filter out packages that are already being linked explicitly via extensions
+            filtered_packages = set()
             for pkg in required_packages:
-                 if not vcpkg_mgr.install_package(pkg):
-                     self.log(f"Failed to install dependency: {pkg}", "bold red")
-                     return False # Stop if dependency fails
+                is_provided = False
+                if extra_link_flags:
+                     for flag in extra_link_flags:
+                         # Heuristic: if -lraylib is present, don't vcpkg install raylib
+                         if flag == f"-l{pkg}":
+                             is_provided = True
+                             self.log(f"Package '{pkg}' is provided by extensions/flags. Skipping vcpkg install.")
+                             break
+                if not is_provided:
+                    filtered_packages.add(pkg)
+            
+            if filtered_packages:
+                self.log(f"Identified dependencies: {', '.join(filtered_packages)}")
+                for pkg in filtered_packages:
+                     if not vcpkg_mgr.install_package(pkg):
+                         self.log(f"Failed to install dependency: {pkg}", "bold red")
+                         return False # Stop if dependency fails
+            else:
+                self.log("Dependencies provided by extensions.")
         else:
             self.log("No external dependencies detected.")
 
@@ -155,6 +172,9 @@ class CmpileBuilder:
         base_compile_flags = []
         if os.path.exists(include_path):
             base_compile_flags.extend(["-I", include_path])
+        if extra_includes:
+            for inc in extra_includes:
+                base_compile_flags.extend(["-I", inc])
         if compiler_flags:
             try:
                 base_compile_flags.extend(shlex.split(compiler_flags))
@@ -213,6 +233,10 @@ class CmpileBuilder:
         cmd = [linker] + object_files + ["-o", output_exe]
         if os.path.exists(lib_path):
             cmd.extend(["-L", lib_path])
+        
+        if extra_lib_paths:
+            for lib in extra_lib_paths:
+                cmd.extend(["-L", lib])
 
         # Add required libraries. This is a simplified approach.
         # A more robust solution would involve checking vcpkg's installed files.
@@ -223,6 +247,9 @@ class CmpileBuilder:
                  if pkg == "sqlite3": cmd.append("-lsqlite3"); continue
                  if pkg == "curl": cmd.append("-lcurl"); continue
                  cmd.append(f"-l{pkg}")
+
+        if extra_link_flags:
+            cmd.extend(extra_link_flags)
 
         cmd.extend(["-static-libgcc", "-static-libstdc++"])
 

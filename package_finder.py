@@ -16,6 +16,7 @@ HEADER_MAPPING = {
     "zlib.h": "zlib",
     "openssl/ssl.h": "openssl",
     "boost/asio.hpp": "boost-asio", # Boost is modular in vcpkg
+    "raylib.h": "raylib",
     # Add more as needed
 }
 

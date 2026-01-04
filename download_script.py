@@ -149,6 +149,51 @@ def install_gcc(log_func=_default_log):
         log_func(f"Compiler installation failed: {e}", "bold red")
         raise e
 
+CMAKE_URL = "https://github.com/Kitware/CMake/releases/download/v3.28.1/cmake-3.28.1-windows-x86_64.zip"
+CMAKE_DIR = os.path.join(INTERNAL_DOWNLOADS, "cmake")
+
+def install_cmake(log_func=_default_log):
+    if is_tool_on_path("cmake"):
+        log_func("CMake is already available on PATH.", "bold blue")
+        return
+    if os.path.exists(CMAKE_DIR) and os.path.exists(os.path.join(CMAKE_DIR, "bin", "cmake.exe")):
+         return
+
+    os.makedirs(INTERNAL_DOWNLOADS, exist_ok=True)
+    zip_path = os.path.join(INTERNAL_DOWNLOADS, "cmake.zip")
+
+    if not os.path.exists(zip_path):
+        log_func(f"Downloading CMake from {CMAKE_URL}...")
+        try:
+            download_file(CMAKE_URL, zip_path, log_func=log_func)
+        except Exception as e:
+            log_func(f"Failed to download CMake: {e}", "bold red")
+            return
+
+    log_func("Extracting CMake...")
+    try:
+        if os.path.exists(CMAKE_DIR):
+             shutil.rmtree(CMAKE_DIR)
+             
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(INTERNAL_DOWNLOADS)
+        
+        extracted_name = None
+        for name in os.listdir(INTERNAL_DOWNLOADS):
+            if name.startswith("cmake-") and name.endswith("windows-x86_64"):
+                extracted_name = name
+                break
+        
+        if extracted_name:
+             shutil.move(os.path.join(INTERNAL_DOWNLOADS, extracted_name), CMAKE_DIR)
+        else:
+             raise Exception("Could not find extracted CMake folder")
+
+        log_func("CMake installed successfully.", "bold green")
+        os.remove(zip_path)
+    except Exception as e:
+         log_func(f"Failed to extract CMake: {e}", "bold red")
+
 def install_vcpkg(git_path_env=None, log_func=_default_log):
     if is_tool_on_path("vcpkg"):
         log_func("vcpkg is already available on PATH.", "bold blue")

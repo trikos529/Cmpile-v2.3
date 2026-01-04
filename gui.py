@@ -4,6 +4,7 @@ import threading
 from tkinter import filedialog
 import cmpile
 import sys
+import extensions
 
 # Set theme
 ctk.set_appearance_mode("Dark")
@@ -14,11 +15,12 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title("Cmpile V2")
-        self.geometry("800x600")
+        self.geometry("900x650")
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
+        # -- Sidebar --
         self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(4, weight=1)
@@ -26,6 +28,11 @@ class App(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Cmpile V2", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
+        # Main Actions are now relative to the active tab, or global?
+        # Keeping them global for the "Build" flow as they manipulate the file list which is in Build tab.
+        # But "Extensions" tab has different actions.
+        # Ideally, sidebar buttons should control the "Build" tab context if that's the primary functions.
+        
         self.add_file_btn = ctk.CTkButton(self.sidebar_frame, text="Add Files", command=self.add_files)
         self.add_file_btn.grid(row=1, column=0, padx=20, pady=10)
 
@@ -38,20 +45,43 @@ class App(ctk.CTk):
         self.quit_button = ctk.CTkButton(self.sidebar_frame, text="Quit", fg_color="transparent", border_width=2, command=self.quit)
         self.quit_button.grid(row=5, column=0, padx=20, pady=10, sticky="s")
 
-        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
-        self.main_frame.grid_rowconfigure(1, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=1)
+        # -- Main Content Area (Tabview) --
+        self.tabview = ctk.CTkTabview(self, corner_radius=10)
+        self.tabview.grid(row=0, column=1, padx=20, pady=10, sticky="nsew")
+        self.tabview.add("Build")
+        self.tabview.add("Extensions")
+        
+        # Configure Grid for Tabs
+        self.tabview.tab("Build").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("Build").grid_rowconfigure(1, weight=1) # File list expands
+        self.tabview.tab("Extensions").grid_columnconfigure(0, weight=1)
 
-        self.file_list_label = ctk.CTkLabel(self.main_frame, text="Source Files", anchor="w")
-        self.file_list_label.grid(row=0, column=0, sticky="w")
+        # -- BUILD TAB CONTENT --
+        self.setup_build_tab()
 
-        self.file_textbox = ctk.CTkTextbox(self.main_frame, height=150)
-        self.file_textbox.grid(row=1, column=0, sticky="nsew", pady=(0, 10))
+        # -- EXTENSIONS TAB CONTENT --
+        self.setup_extensions_tab()
+
+        # Logic
+        self.source_files = []
+        self.builder = cmpile.CmpileBuilder(log_callback=self.log_message)
+        self.extension_manager = extensions.ExtensionManager()
+        
+        # Initialize extension list UI
+        self.refresh_extension_list()
+
+    def setup_build_tab(self):
+        tab = self.tabview.tab("Build")
+        
+        self.file_list_label = ctk.CTkLabel(tab, text="Source Files", anchor="w")
+        self.file_list_label.grid(row=0, column=0, sticky="w", padx=10, pady=(10,0))
+
+        self.file_textbox = ctk.CTkTextbox(tab, height=150)
+        self.file_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=(5, 10))
         self.file_textbox.configure(state="disabled")
 
-        self.options_frame = ctk.CTkFrame(self.main_frame)
-        self.options_frame.grid(row=2, column=0, sticky="ew", pady=(0, 10))
+        self.options_frame = ctk.CTkFrame(tab)
+        self.options_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
 
         self.flags_entry = ctk.CTkEntry(self.options_frame, placeholder_text="Compiler Flags (e.g. -O2 -Wall)")
         self.flags_entry.pack(side="left", expand=True, fill="x", padx=10, pady=10)
@@ -62,15 +92,102 @@ class App(ctk.CTk):
         self.build_btn = ctk.CTkButton(self.options_frame, text="Build & Run", command=self.start_build, fg_color="green", hover_color="darkgreen")
         self.build_btn.pack(side="right", padx=10, pady=10)
 
-        self.log_label = ctk.CTkLabel(self.main_frame, text="Output Log", anchor="w")
-        self.log_label.grid(row=3, column=0, sticky="w")
+        self.log_label = ctk.CTkLabel(tab, text="Output Log", anchor="w")
+        self.log_label.grid(row=3, column=0, sticky="w", padx=10)
 
-        self.log_textbox = ctk.CTkTextbox(self.main_frame, height=200, font=("Consolas", 12))
-        self.log_textbox.grid(row=4, column=0, sticky="nsew")
+        self.log_textbox = ctk.CTkTextbox(tab, height=200, font=("Consolas", 12))
+        self.log_textbox.grid(row=4, column=0, sticky="nsew", padx=10, pady=(5, 10))
         self.log_textbox.configure(state="disabled")
 
-        self.source_files = []
-        self.builder = cmpile.CmpileBuilder(log_callback=self.log_message)
+    def setup_extensions_tab(self):
+        tab = self.tabview.tab("Extensions")
+        
+        # Header / Controls
+        ctrl_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        ctrl_frame.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(ctrl_frame, text="Compiler Path (Optional Override):").pack(side="left", padx=(0,10))
+        self.compiler_path_entry = ctk.CTkEntry(ctrl_frame, placeholder_text="Path to compiler (bin folder)...", width=300)
+        self.compiler_path_entry.pack(side="left")
+        
+        self.install_all_btn = ctk.CTkButton(ctrl_frame, text="Install All Extensions", command=self.install_all_extensions)
+        self.install_all_btn.pack(side="right")
+
+        # List of Extensions
+        self.ext_scroll_frame = ctk.CTkScrollableFrame(tab, label_text="Available Extensions")
+        self.ext_scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def refresh_extension_list(self):
+        # Clear existing
+        for widget in self.ext_scroll_frame.winfo_children():
+            widget.destroy()
+
+        # Add items
+        for ext in self.extension_manager.get_all_extensions():
+            self.create_extension_item(ext)
+
+    def create_extension_item(self, ext):
+        item_frame = ctk.CTkFrame(self.ext_scroll_frame)
+        item_frame.pack(fill="x", padx=5, pady=5)
+
+        name_lbl = ctk.CTkLabel(item_frame, text=ext.name, font=("Arial", 16, "bold"))
+        name_lbl.pack(side="left", padx=10, pady=10)
+
+        status_text = "Installed" if ext.is_installed() else "Not Installed"
+        status_color = "green" if ext.is_installed() else "gray"
+        
+        status_lbl = ctk.CTkLabel(item_frame, text=status_text, text_color=status_color)
+        status_lbl.pack(side="left", padx=10)
+
+        if not ext.is_installed():
+            install_btn = ctk.CTkButton(item_frame, text="Install", width=100, 
+                                        command=lambda e=ext: self.install_extension(e))
+            install_btn.pack(side="right", padx=10)
+            
+            # Manual path button
+            path_btn = ctk.CTkButton(item_frame, text="Set Path", width=100, fg_color="gray",
+                                     command=lambda e=ext: self.set_extension_path(e))
+            path_btn.pack(side="right", padx=5)
+        else:
+             ctk.CTkLabel(item_frame, text=f"Path: {ext.path}", font=("Arial", 10)).pack(side="bottom", anchor="w", padx=10, pady=(0,5))
+
+    def set_extension_path(self, ext):
+        path = filedialog.askdirectory(title=f"Select {ext.name} directory")
+        if path:
+            if ext.set_manual_path(path):
+                self.log_message(f"Path set for {ext.name}", "success")
+                self.refresh_extension_list()
+            else:
+                self.log_message(f"Invalid path for {ext.name}. Could not find required files.", "error")
+
+    def install_extension(self, ext):
+        self.log_message(f"Installing {ext.name}...", "info")
+        # Run in thread
+        t = threading.Thread(target=self._run_install, args=(ext,))
+        t.start()
+    
+    def install_all_extensions(self):
+        self.log_message("Installing all extensions...", "info")
+        t = threading.Thread(target=self._run_install_all)
+        t.start()
+
+    def _run_install(self, ext):
+        def progress(msg):
+             self.log_message(msg)
+        try:
+            ext.install(progress_callback=progress)
+            self.after(0, self.refresh_extension_list)
+        except Exception as e:
+            self.log_message(str(e), "error")
+
+    def _run_install_all(self):
+        def progress(msg):
+             self.log_message(msg)
+        try:
+            self.extension_manager.install_all(progress_callback=progress)
+            self.after(0, self.refresh_extension_list)
+        except Exception as e:
+            self.log_message(str(e), "error")
 
     def add_files(self):
         files = filedialog.askopenfilenames(filetypes=[("C/C++ Files", "*.c *.cpp *.h *.hpp")])
@@ -106,6 +223,7 @@ class App(ctk.CTk):
         self.log_textbox.insert("end", message + "\n")
         self.log_textbox.see("end")
         self.log_textbox.configure(state="disabled")
+        # Ensure build tab is visible if logging error? Maybe not force switch.
 
     def start_build(self):
         if not self.source_files:
@@ -114,6 +232,13 @@ class App(ctk.CTk):
 
         flags = self.flags_entry.get()
         clean = self.clean_checkbox.get() == 1
+        
+        # Check for compiler override
+        compiler_override = self.compiler_path_entry.get().strip()
+        if compiler_override:
+            # Need to pass this to builder.
+            # Currently CmpileBuilder doesn't accept it easily, need to modify CmpileBuilder or modify os.environ
+            os.environ["PATH"] = compiler_override + os.pathsep + os.environ["PATH"]
 
         self.build_btn.configure(state="disabled")
         self.log_textbox.configure(state="normal")
@@ -125,7 +250,30 @@ class App(ctk.CTk):
 
     def run_build_process(self, flags, clean):
         try:
-            self.builder.build_and_run(self.source_files, compiler_flags=flags, clean=clean, run=True)
+            # Gather extensions info
+            ext_includes = []
+            ext_libs = []
+            ext_flags = []
+            
+            for ext in self.extension_manager.get_all_extensions():
+                if ext.is_installed():
+                    inc = ext.get_include_path()
+                    lib = ext.get_lib_path()
+                    lnk = ext.get_link_flags()
+                    if inc: ext_includes.append(inc)
+                    if lib: ext_libs.append(lib)
+                    if lnk: ext_flags.extend(lnk)
+            
+            # Pass these to builder
+            self.builder.build_and_run(
+                self.source_files, 
+                compiler_flags=flags, 
+                clean=clean, 
+                run=True,
+                extra_includes=ext_includes,
+                extra_lib_paths=ext_libs,
+                extra_link_flags=ext_flags
+            )
         except Exception as e:
             self.log_message(f"A critical error occurred: {e}", "error")
         finally:
