@@ -20,8 +20,6 @@ On the first run, Cmpile will:
 - Compile and run your program.
 
 
-
-
 ### Options
 - `--compiler-flags "..."`: Pass extra flags to the compiler.
   - Example: `python cmpile.py main.cpp --compiler-flags "-O3 -Wall"`
@@ -33,5 +31,14 @@ On the first run, Cmpile will:
 - **Infrastructure**: All tools (compiler, git, vcpkg) are downloaded into the `internal_downloads` folder. To uninstall, simply delete that folder.
 - **Dependencies**: The tool scans your C++ file for headers. If it sees a known header (like `fmt/core.h` or `nlohmann/json.hpp`), it installs the corresponding package via vcpkg.
 
-
-
+## What's New
+ # Version 2.3
+  - Fixed some errors with dependency installtion.
+  - Some other bugs fixes and improvements.
+  - Rebranded to Version 2.3.
+ # Version 2.2
+  - Added a new Feature called Extensions. You can now install extensions to add packages to your project wothout needing them to download from vcpkg.
+  - For now, added two extensions but more will be added in later updates.
+  - Added the ability to add custom extensions from local files.
+  - Added a new "Clear Log Output" button to the GUI.
+  - Rebranded to Version 2.2.
