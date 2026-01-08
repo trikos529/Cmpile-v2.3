@@ -15,8 +15,8 @@
 On the first run, Cmpile will:
 - Download a portable C++ compiler (LLVM-Mingw).
 - Download and set up `vcpkg` for library management.
-- Download and add Git to PATH for cloning other dependencies.
-- Download and add Cmake to PATH for building dependencies and extensions.
+- Download and add `Git` to PATH for cloning other dependencies.
+- Download and add `Cmake` to PATH for building dependencies and extensions.
 - Detect any `#include` libraries in your code (e.g., `#include <nlohmann/json.hpp>`).
 - If needed, you may install any of the available extensions from the Extensions tab.
 - Install those libraries automatically.
@@ -64,4 +64,5 @@ On the first run, Cmpile will:
   - For now, added two extensions but more will be added in later updates.
   - Added the ability to add custom extensions from local files.
   - Added a new "Clear Log Output" button to the GUI.
+
   - Rebranded to Version 2.2.
